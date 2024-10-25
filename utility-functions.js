@@ -5,7 +5,7 @@ import MIME_TYPES from './mime-types.js';
  *
  */
 export function processClientRequest(requestHandle, responseHandle, path, router) {
-  var resourceRequestedByClient = path + requestHandle.url;
+  var resourceRequestedByClient = removeDoubleSlashesIfAny(path + requestHandle.url);
   console.log(`resourceRequestedByClient: ${resourceRequestedByClient}`);
   
   if (router == null) {
@@ -14,6 +14,35 @@ export function processClientRequest(requestHandle, responseHandle, path, router
   else {
     router.sendResponseToClient(requestHandle, responseHandle, resourceRequestedByClient);
   }
+}
+
+/**
+ *
+ */
+export function thereIsMatch(regularExpression, string) {
+  console.log(`regularExpression is "${regularExpression}"`);
+  regularExpression = RegExp('^' + regularExpression + '$', 'g');
+  //console.log(`Again, regularExpression is "${regularExpression}", testing with ${string}, result is ${regularExpression.test(string)}`);
+  return regularExpression.test(string);
+}
+
+/**
+ *
+ */
+export function removeDoubleSlashesIfAny(originalString) {
+  var resultString = '';
+  var previousCharacter = '';
+  var currentCharacter;
+  
+  for (var i = 0; i < originalString.length; i++, previousCharacter = originalString[i - 1]) {
+    currentCharacter = originalString[i];
+    
+    if (currentCharacter != '/' || previousCharacter != '/') {
+      resultString += currentCharacter;
+    }
+  }
+  
+  return resultString;
 }
 
 /**

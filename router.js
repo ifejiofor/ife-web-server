@@ -1,4 +1,4 @@
-import {sendResponseToClientWithoutRouter} from './utility-functions.js';
+import {sendResponseToClientWithoutRouter, thereIsMatch} from './utility-functions.js';
 
 class Router {
   /**
@@ -7,16 +7,37 @@ class Router {
    */
   constructor(routingTable) {
     this.routingTable = routingTable;
+    
+    for (var key in this.routingTable) {
+      this.routingTable[key] = key.replace(key.match(/(:[a-zA-Z_]+)/g), '([a-zA-Z_]+)');
+    }
   }
   
   /**
    * 
    */
   sendResponseToClient(requestHandle, responseHandle, resourceRequestedByClient) {
+    var controller, firstPartOfControllerPath, controllerParameter;
     var controllerPath = resourceRequestedByClient.substring(1);
+    var matchingKey = '';
     
-    var controller = this.routingTable[controllerPath];
-    var controllerParameter = null;
+    for (var key in this.routingTable) {
+       console.log(`Within the router, thereIsMatch(key, controllerPath) is ${thereIsMatch(key, controllerPath)}`);
+       if (thereIsMatch(key, controllerPath) === true) {
+          matchingKey = key;
+          console.log(`...Since thereisMatch I set matchingkey to ${matchingKey}`);
+          break;
+       }
+    }
+    
+    console.log(`...As at this point, matchingKey is ${matchingKey}`);
+    
+    if (matchingKey != '') {
+      console.log(this.routingTable);
+      controller = this.routingTable[matchingKey];
+      firstPartOfControllerPath = controllerPath.match(/^\/[a-zA-Z_]+(\/)*/g);
+      controllerParameter = controllerPath.replace(firstPartOfControllerPath, '');
+    }
     
     if (typeof(controller) != 'function' && controllerPath[controllerPath.length - 1] == '/') {
       var responseCode = 302;  // This response code is for HTTP "temporary" redirect
@@ -26,28 +47,8 @@ class Router {
       return;
     }
     
-    if (typeof(controller) != 'function' && /^\/categories\/([a-zA-Z0-9-]+)$/.test(controllerPath) == true) {
-      controllerParameter = controllerPath.replace(/\/categories\//g, '').match(/([a-zA-Z0-9-]+)/g);
-      controllerPath = controllerPath.match(/\/categories/g) + '/:categoryId';
-      controller = this.routingTable[controllerPath];
-    }
-    
-    if (typeof(controller) != 'function') {
-      if (/^\/categories\/([a-zA-Z0-9-]+)$/.test(controllerPath) == true) {
-        controllerParameter = controllerPath.replace(/\/categories\//g, '').match(/([a-zA-Z0-9-]+)/g);
-        controllerPath = controllerPath.match(/\/categories/g) + '/:categoryId';
-        controller = this.routingTable[controllerPath];
-      }
-      else if (/^\/change_currency\/([a-zA-Z0-9-]+)$/.test(controllerPath) == true) {
-      console.log(`2, Regular Expression match! controllerPath is ${controllerPath}, controllerParameter is ${controllerParameter}`);
-        controllerParameter = controllerPath.replace(/\/change_currency\//g, '').match(/([a-zA-Z0-9-]+)/g);
-        controllerPath = controllerPath.match(/\/change_currency/g) + '/:currency';
-        controller = this.routingTable[controllerPath];
-      }
-    }
-    
     if (typeof(controller) == 'function') {
-      if (controllerParameter == null) {
+      if (controllerParameter == '') {
         controller(requestHandle, responseHandle);
       }
       else {

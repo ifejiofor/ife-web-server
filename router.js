@@ -1,63 +1,72 @@
-import {sendResponseToClientWithoutRouter, thereIsMatch} from './utility-functions.js';
+import { replacePathParametersWithRegularExpressions } from './utility-functions.js';
+import { sendResponseToClientWithoutRouter } from './utility-functions.js';
+import { refersToResourceFromAssetFolder } from './utility-functions.js';
+import { NAME_OF_ASSET_FOLDER } from './utility-constants.js';
+import { firstCharacterOf } from './utility-functions.js';
+import { lastCharacterOf } from './utility-functions.js';
+import { thereIsMatch } from './utility-functions.js';
+import { redirectTo } from './utility-functions.js';
 
+/**
+ * Create a router to route client requests to appropriate controller functions.
+ * @class
+ */
 class Router {
   /**
-   * Constructor
-   * @param {JSON} routingTable - the routing table of this router
+   * Constructor.
+   * @param {JSON} routingTableOfThisRouter - the routing table of this router.
    */
-  constructor(routingTable) {
-    this.routingTable = routingTable;
+  constructor(routingTableOfThisRouter) {
+    this.routingTable = routingTableOfThisRouter;
+    replacePathParametersWithRegularExpressions(this.routingTable);
     
-    for (var key in this.routingTable) {
-      this.routingTable[key] = key.replace(key.match(/(:[a-zA-Z_]+)/g), '([a-zA-Z_]+)');
-    }
+    console.log(this.routingTable);
   }
   
   /**
-   * 
+   * Send response to a client.
+   * @param {object} requestHandle - object that contains details about the client's request.
+   * @param {object} responseHandle - object that can be used to send response to the client.
+   * @param {string} urlRequestedByClient - url of resource that was requested by the client.
    */
-  sendResponseToClient(requestHandle, responseHandle, resourceRequestedByClient) {
-    var controller, firstPartOfControllerPath, controllerParameter;
-    var controllerPath = resourceRequestedByClient.substring(1);
-    var matchingKey = '';
+  sendResponseToClient(requestHandle, responseHandle, urlRequestedByClient) {
+    let path = null, matchingPath = null, matchHasBeenFound = false;
+    let controller = null;
+    let firstPartOfUrl = null, secondPartOfUrl = null, urlToRedirectTo = null;
+    let indexOfAssetFolder = null;
     
-    for (var key in this.routingTable) {
-       console.log(`Within the router, thereIsMatch(key, controllerPath) is ${thereIsMatch(key, controllerPath)}`);
-       if (thereIsMatch(key, controllerPath) === true) {
-          matchingKey = key;
-          console.log(`...Since thereisMatch I set matchingkey to ${matchingKey}`);
-          break;
-       }
+    if (firstCharacterOf(urlRequestedByClient) == '.') {
+      urlRequestedByClient = urlRequestedByClient.substring(1);
     }
     
-    console.log(`...As at this point, matchingKey is ${matchingKey}`);
-    
-    if (matchingKey != '') {
-      console.log(this.routingTable);
-      controller = this.routingTable[matchingKey];
-      firstPartOfControllerPath = controllerPath.match(/^\/[a-zA-Z_]+(\/)*/g);
-      controllerParameter = controllerPath.replace(firstPartOfControllerPath, '');
+    for (path in this.routingTable) {
+      if (thereIsMatch(path, urlRequestedByClient)) {
+        matchHasBeenFound = true;
+        matchingPath = path;
+        break;
+      }
     }
     
-    if (typeof(controller) != 'function' && controllerPath[controllerPath.length - 1] == '/') {
-      var responseCode = 302;  // This response code is for HTTP "temporary" redirect
-      var responseHeader = { 'Location': controllerPath.substring(0, controllerPath.length - 1) };
-      responseHandle.writeHead(responseCode, responseHeader);
-      responseHandle.end();
-      return;
+    if (matchHasBeenFound) {
+      controller = this.routingTable[matchingPath];
+      console.log(`   matchingPath: ${matchingPath}`);
     }
     
     if (typeof(controller) == 'function') {
-      if (controllerParameter == '') {
-        controller(requestHandle, responseHandle);
-      }
-      else {
-      console.log(`2, Regular Expression match! controllerPath is ${controllerPath}, controllerParameter is ${controllerParameter}`);
-        controller(requestHandle, responseHandle, controllerParameter);
-      }
+      controller(requestHandle, responseHandle);
+    }
+    else if (typeof(controller) != 'function' && lastCharacterOf(urlRequestedByClient) == '/') {
+      urlToRedirectTo = urlRequestedByClient.substring(0, urlRequestedByClient.length - 1);
+      redirectTo(urlToRedirectTo, responseHandle);
+    }
+    else if (typeof(controller) != 'function' && refersToResourceFromAssetFolder(urlRequestedByClient)) {
+      indexOfAssetFolder = urlRequestedByClient.indexOf(NAME_OF_ASSET_FOLDER);
+      urlRequestedByClient = '.' + urlRequestedByClient.substring(indexOfAssetFolder);
+      sendResponseToClientWithoutRouter(requestHandle, responseHandle, urlRequestedByClient);
     }
     else {
-      sendResponseToClientWithoutRouter(requestHandle, responseHandle, resourceRequestedByClient);
+      responseHandle.writeHead(404, { 'Content-Type': 'text/plain' });
+      responseHandle.end('404 not found.');
     }
   }
 }

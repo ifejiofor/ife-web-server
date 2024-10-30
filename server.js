@@ -1,6 +1,6 @@
 import http from 'node:http';
 import Router from './router.js';
-import {processClientRequest} from './utility-functions.js';
+import { processClientRequest } from './utility-functions.js';
 
 /**
  * Create an HTTP server listening to a specific port.
@@ -8,15 +8,15 @@ import {processClientRequest} from './utility-functions.js';
  */
 export class Server {
   /**
-   * Constructor
+   * Constructor.
    */
   constructor() {
     this.router = null;
   }
   
   /**
-   * Set the routing table
-   * @param {JSON} routingTable - the routing table in JSON format
+   * Set the routing table of the router of this server.
+   * @param {JSON} routingTable - the routing table.
    */
   setRoutingTable(routingTable) {
     this.router = new Router(routingTable);
@@ -28,13 +28,13 @@ export class Server {
    * @param {number} port - a port number (between 1024–49151).
    */
   start(path, port = 8080) {
-    var router = this.router;
+    let router = this.router;
     
-    var callbackForProcessingClientRequests = function (requestHandle, responseHandle) {
+    let callbackForProcessingClientRequests = function (requestHandle, responseHandle) {
       processClientRequest(requestHandle, responseHandle, path, router);
     }
     
-    var serverObject = http.createServer(callbackForProcessingClientRequests);
+    let serverObject = http.createServer(callbackForProcessingClientRequests);
     serverObject.listen(port);
     console.log(`Server is started on port ${port}`);
   }

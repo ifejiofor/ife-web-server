@@ -1,130 +1,202 @@
 import fs from 'node:fs';
-import MIME_TYPES from './mime-types.js';
+import { NAME_OF_ASSET_FOLDER, MIME_TYPES } from './utility-constants.js';
+
+// Utility functions.
 
 /**
- *
+ * Process client request.
+ * @param {object} requestHandle - object that contains details about the client's request.
+ * @param {object} responseHandle - object that can be used to send response to the client.
+ * @param {string} path - the entry point of the files the server is supposed to deliver.
+ * @param {Router} router - the router whose job is to route client requests to appropriate controller functions.
  */
 export function processClientRequest(requestHandle, responseHandle, path, router) {
-  var resourceRequestedByClient = removeDoubleSlashesIfAny(path + requestHandle.url);
-  console.log(`resourceRequestedByClient: ${resourceRequestedByClient}`);
+  let fullUrl = path + requestHandle.url;
+  fullUrl = removeDoubleSlashesIfAny(fullUrl);
+  console.log(`urlRequestedByClient: ${fullUrl}`);
   
   if (router == null) {
-    sendResponseToClientWithoutRouter(requestHandle, responseHandle, resourceRequestedByClient);
+    sendResponseToClientWithoutRouter(requestHandle, responseHandle, fullUrl);
   }
   else {
-    router.sendResponseToClient(requestHandle, responseHandle, resourceRequestedByClient);
+    router.sendResponseToClient(requestHandle, responseHandle, fullUrl);
   }
 }
 
 /**
- *
+ * Replace all path parameters, in a routing table, with regular expressions.
+ * @param {JSON} routingTable - the routing table whose path parameters are to be replaced.
+ */
+export function replacePathParametersWithRegularExpressions(routingTable) {
+  let path = null, pathBeingReplaced = null, originalPath = null, pathParameters = null;
+  let thereWasReplacement = false;
+  
+  for (path in routingTable) {
+    pathParameters = path.match(RegExp(':[a-zA-Z0-9_]+', 'g'));
+    pathBeingReplaced = originalPath = path;
+    thereWasReplacement = false;
+    
+    for (let i = 0; pathParameters != null && i < pathParameters.length; i++) {
+      pathBeingReplaced = pathBeingReplaced.replace(pathParameters[i], '[a-zA-Z0-9_]+');
+      thereWasReplacement = true;
+    }
+    
+    if (thereWasReplacement) {
+      routingTable[pathBeingReplaced] = routingTable[originalPath];
+      delete routingTable[originalPath];
+    }
+  }
+}
+
+/**
+ * Return the first character of a string.
+ * @param {string} string - the string whose first character is to be returned.
+ */
+export function firstCharacterOf(string) {
+  return string.charAt(0);
+}
+
+/**
+ * Return the last character of a string.
+ * @param {string} string - the string whose last character is to be returned.
+ */
+export function lastCharacterOf(string) {
+  return string.charAt(string.length - 1);
+}
+
+/**
+ * Return true if there is a match between a regular expression and a string. Return false otherwise.
+ * @param {string} regularExpression - the regular expression.
+ * @param {string} string - the string.
  */
 export function thereIsMatch(regularExpression, string) {
-  console.log(`regularExpression is "${regularExpression}"`);
-  regularExpression = RegExp('^' + regularExpression + '$', 'g');
-  //console.log(`Again, regularExpression is "${regularExpression}", testing with ${string}, result is ${regularExpression.test(string)}`);
+  regularExpression = RegExp('^' + regularExpression + '$');
   return regularExpression.test(string);
 }
 
 /**
- *
+ * Redirect a client to a URL.
+ * @param {string} urlToRedirectTo - the URL to redirect to.
+ * @param {object} responseHandle - object that can be used to send response to the client.
  */
-export function removeDoubleSlashesIfAny(originalString) {
-  var resultString = '';
-  var previousCharacter = '';
-  var currentCharacter;
-  
-  for (var i = 0; i < originalString.length; i++, previousCharacter = originalString[i - 1]) {
-    currentCharacter = originalString[i];
-    
-    if (currentCharacter != '/' || previousCharacter != '/') {
-      resultString += currentCharacter;
-    }
-  }
-  
-  return resultString;
+export function redirectTo(urlToRedirectTo, responseHandle) {
+  let codeOfResponse = 302;  // This code means HTTP temporary redirect
+  let headerOfResponse = { 'Location': urlToRedirectTo };
+  responseHandle.writeHead(codeOfResponse, headerOfResponse);
+  responseHandle.end();
 }
 
 /**
- *
+ * Return true if a url refers to a resource from the asset folder. Return false otherwise.
+ * @param {string} url - the url.
+ */
+export function refersToResourceFromAssetFolder(url) {
+  return url.indexOf(NAME_OF_ASSET_FOLDER) != -1;
+}
+
+/**
+ * Remove double slashes, if any, from a string.
+ * @param {string} originalString - the string to remove double slashes from.
+ */
+export function removeDoubleSlashesIfAny(originalString) {
+  return originalString.replace('//', '/');
+}
+
+/**
+ * Send response to a client without using a router.
+ * @param {object} requestHandle - object that contains details about the client's request.
+ * @param {object} responseHandle - object that can be used to send response to the client.
+ * @param {string} fileRequestedByClient - URL of file requested for by the client.
  */
 export function sendResponseToClientWithoutRouter(requestHandle, responseHandle, fileRequestedByClient) {
-  var callbackForSendingResponseToClient = function (error, data) {
-    var responseCode = getResponseCode(fileRequestedByClient, error, data);
-    var responseHeaders = getResponseHeader(fileRequestedByClient, error, data);
-    var responseBody = getResponseBody(fileRequestedByClient, error, data);
-    responseHandle.writeHeader(responseCode, responseHeaders);
-    responseHandle.end(responseBody);
+  let callbackForSendingResponseToClient = function (error, data) {
+    let codeOfResponse = getCodeOfResponse(fileRequestedByClient, error, data);
+    let headerOfResponses = getHeaderOfResponse(fileRequestedByClient, error, data);
+    let bodyOfResponse = getBodyOfResponse(fileRequestedByClient, error, data);
+    responseHandle.writeHead(codeOfResponse, headerOfResponses);
+    responseHandle.end(bodyOfResponse);
   }
   
   fs.readFile(fileRequestedByClient, callbackForSendingResponseToClient);
 }
 
 /**
- *
+ * Return the code of response to that should be sent to client.
+ * @param {string} fileRequestedByClient - URL of file requested for by the client.
+ * @param {object} error - object that indicates whether there was an error in reading the file requested for by the client.
+ * @param {object} data - data from the file requested for by the client.
  */
-export function getResponseCode(fileRequestedByClient, error, data) {
+export function getCodeOfResponse(fileRequestedByClient, error, data) {
+  let codeOfResponse = '';
+  
   if (error) {
-    var responseCode = 404;
+    codeOfResponse = 404;
   }
   else {
-    var responseCode = 200;
+    codeOfResponse = 200;
   }
   
-  return responseCode;
+  return codeOfResponse;
 }
 
 /**
- *
+ * Return the header of response to that should be sent to client.
+ * @param {string} fileRequestedByClient - URL of file requested for by the client.
+ * @param {object} error - object that indicates whether there was an error in reading the file requested for by the client.
+ * @param {object} data - data from the file requested for by the client.
  */
-export function getResponseHeader(fileRequestedByClient, error, data) {
-  var mimeType = getMimeType(fileRequestedByClient);
-
-  var responseHeader = {
-    'Content-Type': mimeType == undefined ? 'text/plain' : mimeType
-  };
+export function getHeaderOfResponse(fileRequestedByClient, error, data) {
+  let headerOfResponse = '';
+  let mimeType = getMimeType(fileRequestedByClient);
   
-  return responseHeader;
-}
-
-/**
- *
- */
-export function getResponseBody(fileRequestedByClient, error, data) {
-  if (error) {
-    var responseBody = '404 Not Found';
+  if (mimeType == undefined) {
+    headerOfResponse = { 'Content-Type': 'text/plain' };
   }
   else {
-    var responseBody = data;
+    headerOfResponse = { 'Content-Type': mimeType };
   }
   
-  return responseBody;
+  return headerOfResponse;
 }
 
 /**
- * Return the MIME type of a file
- * @param {string} filename - the filename of the file
+ * Return the body of response to that should be sent to client.
+ * @param {string} fileRequestedByClient - URL of file requested for by the client.
+ * @param {object} error - object that indicates whether there was an error in reading the file requested for by the client.
+ * @param {object} data - data from the file requested for by the client.
+ */
+export function getBodyOfResponse(fileRequestedByClient, error, data) {
+  let bodyOfResponse = '';
+  
+  if (error) {
+    bodyOfResponse = '404 Not Found';
+  }
+  else {
+    bodyOfResponse = data;
+  }
+  
+  return bodyOfResponse;
+}
+
+/**
+ * Return the MIME type of a file.
+ * @param {string} filename - filename of the file.
  */
 export function getMimeType(filename) {
-  var fileExtension = getFileExtension(filename);
+  let fileExtension = getFileExtension(filename);
   return MIME_TYPES[fileExtension];
 }
 
 /**
- * Extract the file extension of a file
- * @param {string} filename - the filename of the file
+ * Extract the file extension of a file.
+ * @param {string} filename - filename of the file.
  */
 export function getFileExtension(filename) {
-  var fileExtension = '';
-    
-  for (var i = filename.length - 1; i > 0 && filename[i] != '.' && filename[i] != '/'; i--) {
-    fileExtension = filename[i] + fileExtension;
+  let fileExtension = filename.match(RegExp('.[a-z]+$'));
+  
+  if (fileExtension != null) {
+    fileExtension = fileExtension.toString().substring(1);
   }
   
-  if (i > 0 && filename[i] == '.') {
-    return fileExtension;
-  }
-  else {
-    return '';
-  }
+  return fileExtension;
 }

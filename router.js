@@ -1,6 +1,7 @@
 import { replacePathParametersWithRegularExpressions } from './utility-functions.js';
 import { sendResponseToClientWithoutRouter } from './utility-functions.js';
 import { refersToResourceFromAssetFolder } from './utility-functions.js';
+import { capitalizeAllMethodNames } from './utility-functions.js';
 import { NAME_OF_ASSET_FOLDER } from './utility-constants.js';
 import { firstCharacterOf } from './utility-functions.js';
 import { lastCharacterOf } from './utility-functions.js';
@@ -19,7 +20,7 @@ class Router {
   constructor(routingTableOfThisRouter) {
     this.routingTable = routingTableOfThisRouter;
     replacePathParametersWithRegularExpressions(this.routingTable);
-    
+    capitalizeAllMethodNames(this.routingTable);
     console.log(this.routingTable);
   }
   
@@ -31,6 +32,7 @@ class Router {
    */
   sendResponseToClient(requestHandle, responseHandle, urlRequestedByClient) {
     let path = null, matchingPath = null, matchHasBeenFound = false;
+    let httpMethodRequestedByClient = requestHandle.method;
     let controller = null;
     let firstPartOfUrl = null, secondPartOfUrl = null, urlToRedirectTo = null;
     let indexOfAssetFolder = null;
@@ -47,9 +49,15 @@ class Router {
       }
     }
     
-    if (matchHasBeenFound) {
-      controller = this.routingTable[matchingPath];
-      console.log(`   matchingPath: ${matchingPath}`);
+    if (matchHasBeenFound && this.routingTable[matchingPath][httpMethodRequestedByClient] == null) {
+      console.log(`   matchingPath: ${matchingPath}, httpMethodRequestedByClient: ${httpMethodRequestedByClient}`);
+      responseHandle.writeHead(405, { 'Content-Type': 'text/plain' });
+      responseHandle.end('405 Method Not Allowed');
+      return;
+    }
+    else if (matchHasBeenFound && this.routingTable[matchingPath][httpMethodRequestedByClient] != null) {
+      console.log(`   matchingPath: ${matchingPath}, httpMethodRequestedByClient: ${httpMethodRequestedByClient}`);
+      controller = this.routingTable[matchingPath][httpMethodRequestedByClient];
     }
     
     if (typeof(controller) == 'function') {

@@ -49,6 +49,24 @@ export function replacePathParametersWithRegularExpressions(routingTable) {
 }
 
 /**
+ *
+ */
+export function capitalizeAllMethodNames(routingTable) {
+  for (let path in routingTable) {
+    let controllerObject = routingTable[path];
+    
+    for (let originalMethodName in controllerObject) {
+      let capitalizedMethodName = originalMethodName.toString().toUpperCase();
+      
+      if (capitalizedMethodName != originalMethodName) {
+        controllerObject[capitalizedMethodName] = controllerObject[originalMethodName];
+        delete controllerObject[originalMethodName];
+      }
+    }
+  }
+}
+
+/**
  * Return the first character of a string.
  * @param {string} string - the string whose first character is to be returned.
  */

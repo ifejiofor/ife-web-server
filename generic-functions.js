@@ -1,27 +1,7 @@
 import fs from 'node:fs';
-import { NAME_OF_ASSET_FOLDER, MIME_TYPES } from './utility-constants.js';
+import { NAME_OF_ASSET_FOLDER, MIME_TYPES } from './constants.js';
 
 // Utility functions.
-
-/**
- * Process client request.
- * @param {object} requestHandle - object that contains details about the client's request.
- * @param {object} responseHandle - object that can be used to send response to the client.
- * @param {string} path - the entry point of the files the server is supposed to deliver.
- * @param {Router} router - the router whose job is to route client requests to appropriate controller functions.
- */
-export function processClientRequest(requestHandle, responseHandle, path, router) {
-  let fullUrl = path + requestHandle.url;
-  fullUrl = removeDoubleSlashesIfAny(fullUrl);
-  console.log(`urlRequestedByClient: ${fullUrl}`);
-  
-  if (router == null) {
-    sendResponseToClientWithoutRouter(requestHandle, responseHandle, fullUrl);
-  }
-  else {
-    router.sendResponseToClient(requestHandle, responseHandle, fullUrl);
-  }
-}
 
 /**
  * Replace all path parameters, in a routing table, with regular expressions.

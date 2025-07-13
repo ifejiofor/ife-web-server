@@ -1,34 +1,28 @@
-import { replacePathParametersWithRegularExpressions } from './utility-functions.js';
-import { sendResponseToClientWithoutRouter } from './utility-functions.js';
-import { refersToResourceFromAssetFolder } from './utility-functions.js';
-import { capitalizeAllMethodNames } from './utility-functions.js';
-import { NAME_OF_ASSET_FOLDER } from './utility-constants.js';
-import { firstCharacterOf } from './utility-functions.js';
-import { lastCharacterOf } from './utility-functions.js';
-import { thereIsMatch } from './utility-functions.js';
-import { redirectTo } from './utility-functions.js';
+import { thereIsMatch } from './generic-functions.js';
+import * as genericFunctions from './generic-functions.js';
+import { NAME_OF_ASSET_FOLDER } from './constants.js';
 
 /**
- * Create a router to route client requests to appropriate controller functions.
+ * Router that can route client requests to appropriate controller functions
  * @class
  */
 class Router {
   /**
-   * Constructor.
-   * @param {JSON} routingTableOfThisRouter - the routing table of this router.
+   * Constructor
+   * @param {JSON} routingTableOfThisRouter - the routing table of this router
    */
   constructor(routingTableOfThisRouter) {
     this.routingTable = routingTableOfThisRouter;
-    replacePathParametersWithRegularExpressions(this.routingTable);
-    capitalizeAllMethodNames(this.routingTable);
+    genericFunctions.replacePathParametersWithRegularExpressions(this.routingTable);
+    genericFunctions.capitalizeAllMethodNames(this.routingTable);
     console.log(this.routingTable);
   }
   
   /**
-   * Send response to a client.
-   * @param {object} requestHandle - object that contains details about the client's request.
-   * @param {object} responseHandle - object that can be used to send response to the client.
-   * @param {string} urlRequestedByClient - url of resource that was requested by the client.
+   * Send response to a client
+   * @param {object} requestHandle - object that contains details about the client's request
+   * @param {object} responseHandle - object that can be used to send response to the client
+   * @param {string} urlRequestedByClient - url of resource that was requested by the client
    */
   sendResponseToClient(requestHandle, responseHandle, urlRequestedByClient) {
     let path = null, matchingPath = null, matchHasBeenFound = false;
@@ -49,14 +43,14 @@ class Router {
       }
     }
     
+    console.log(`   matchingPath: ${matchingPath}, httpMethodRequestedByClient: ${httpMethodRequestedByClient}`);
+    
     if (matchHasBeenFound && this.routingTable[matchingPath][httpMethodRequestedByClient] == null) {
-      console.log(`   matchingPath: ${matchingPath}, httpMethodRequestedByClient: ${httpMethodRequestedByClient}`);
       responseHandle.writeHead(405, { 'Content-Type': 'text/plain' });
       responseHandle.end('405 Method Not Allowed');
       return;
     }
     else if (matchHasBeenFound && this.routingTable[matchingPath][httpMethodRequestedByClient] != null) {
-      console.log(`   matchingPath: ${matchingPath}, httpMethodRequestedByClient: ${httpMethodRequestedByClient}`);
       controller = this.routingTable[matchingPath][httpMethodRequestedByClient];
     }
     
@@ -65,12 +59,12 @@ class Router {
     }
     else if (typeof(controller) != 'function' && lastCharacterOf(urlRequestedByClient) == '/') {
       urlToRedirectTo = urlRequestedByClient.substring(0, urlRequestedByClient.length - 1);
-      redirectTo(urlToRedirectTo, responseHandle);
+      genericFunctions.redirectTo(urlToRedirectTo, responseHandle);
     }
     else if (typeof(controller) != 'function' && refersToResourceFromAssetFolder(urlRequestedByClient)) {
       indexOfAssetFolder = urlRequestedByClient.indexOf(NAME_OF_ASSET_FOLDER);
       urlRequestedByClient = '.' + urlRequestedByClient.substring(indexOfAssetFolder);
-      sendResponseToClientWithoutRouter(requestHandle, responseHandle, urlRequestedByClient);
+      genericFunctions.sendResponseToClientWithoutRouter(requestHandle, responseHandle, urlRequestedByClient);
     }
     else {
       responseHandle.writeHead(404, { 'Content-Type': 'text/plain' });

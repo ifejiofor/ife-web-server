@@ -1,8 +1,6 @@
 import fs from 'node:fs';
 import { NAME_OF_ASSET_FOLDER, MIME_TYPES } from './constants.js';
 
-// Utility functions.
-
 /**
  * Replace all path parameters, in a routing table, with regular expressions.
  * @param {JSON} routingTable - the routing table whose path parameters are to be replaced.
@@ -79,8 +77,8 @@ export function thereIsMatch(regularExpression, string) {
  */
 export function redirectTo(urlToRedirectTo, responseHandle) {
   let codeOfResponse = 302;  // This code means HTTP temporary redirect
-  let headerOfResponse = { 'Location': urlToRedirectTo };
-  responseHandle.writeHead(codeOfResponse, headerOfResponse);
+  let headOfResponse = { 'Location': urlToRedirectTo };
+  responseHandle.writeHead(codeOfResponse, headOfResponse);
   responseHandle.end();
 }
 
@@ -107,15 +105,13 @@ export function removeDoubleSlashesIfAny(originalString) {
  * @param {string} fileRequestedByClient - URL of file requested for by the client.
  */
 export function sendResponseToClientWithoutRouter(requestHandle, responseHandle, fileRequestedByClient) {
-  let callbackForSendingResponseToClient = function (error, data) {
+  fs.readFile(fileRequestedByClient, function (error, data) {
     let codeOfResponse = getCodeOfResponse(fileRequestedByClient, error, data);
-    let headerOfResponses = getHeaderOfResponse(fileRequestedByClient, error, data);
+    let headOfResponses = getHeadOfResponse(fileRequestedByClient, error, data);
     let bodyOfResponse = getBodyOfResponse(fileRequestedByClient, error, data);
-    responseHandle.writeHead(codeOfResponse, headerOfResponses);
+    responseHandle.writeHead(codeOfResponse, headOfResponses);
     responseHandle.end(bodyOfResponse);
-  }
-  
-  fs.readFile(fileRequestedByClient, callbackForSendingResponseToClient);
+  });
 }
 
 /**
@@ -124,7 +120,7 @@ export function sendResponseToClientWithoutRouter(requestHandle, responseHandle,
  * @param {object} error - object that indicates whether there was an error in reading the file requested for by the client.
  * @param {object} data - data from the file requested for by the client.
  */
-export function getCodeOfResponse(fileRequestedByClient, error, data) {
+function getCodeOfResponse(fileRequestedByClient, error, data) {
   let codeOfResponse = '';
   
   if (error) {
@@ -138,23 +134,23 @@ export function getCodeOfResponse(fileRequestedByClient, error, data) {
 }
 
 /**
- * Return the header of response to that should be sent to client.
+ * Return the head of response to that should be sent to client.
  * @param {string} fileRequestedByClient - URL of file requested for by the client.
  * @param {object} error - object that indicates whether there was an error in reading the file requested for by the client.
  * @param {object} data - data from the file requested for by the client.
  */
-export function getHeaderOfResponse(fileRequestedByClient, error, data) {
-  let headerOfResponse = '';
+function getHeadOfResponse(fileRequestedByClient, error, data) {
+  let headOfResponse = '';
   let mimeType = getMimeType(fileRequestedByClient);
   
   if (mimeType == undefined) {
-    headerOfResponse = { 'Content-Type': 'text/plain' };
+    headOfResponse = { 'Content-Type': 'text/plain' };
   }
   else {
-    headerOfResponse = { 'Content-Type': mimeType };
+    headOfResponse = { 'Content-Type': mimeType };
   }
   
-  return headerOfResponse;
+  return headOfResponse;
 }
 
 /**
@@ -163,7 +159,7 @@ export function getHeaderOfResponse(fileRequestedByClient, error, data) {
  * @param {object} error - object that indicates whether there was an error in reading the file requested for by the client.
  * @param {object} data - data from the file requested for by the client.
  */
-export function getBodyOfResponse(fileRequestedByClient, error, data) {
+function getBodyOfResponse(fileRequestedByClient, error, data) {
   let bodyOfResponse = '';
   
   if (error) {

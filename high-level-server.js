@@ -1,12 +1,12 @@
 import http from './ife-http-manager.js'; // this is my alternative to `import http from 'node:http'`
 import Router from './router.js';
-import { sendResponseToClientWithoutRouter } from './generic-functions.js';
+import * as GenericFunctions from './generic-functions.js';
 
 /**
  * High-level HTTP server that can listen on a specific port
  * @class
  */
-export class HighLevelServer {
+class HighLevelServer {
   /**
    * Constructor
    */
@@ -19,7 +19,8 @@ export class HighLevelServer {
    * @param {JSON} routingTable - the routing table
    */
   setRoutingTable(routingTable) {
-    this.router = new Router(routingTable);
+    this.router = new Router()
+    this.router.setRoutingTable(routingTable);
   }
   
   /**
@@ -53,7 +54,7 @@ function processClientRequest(requestHandle, responseHandle, path, router) {
   console.log(`urlRequestedByClient: ${fullUrl}`);
   
   if (router == null) {
-    sendResponseToClientWithoutRouter(requestHandle, responseHandle, fullUrl);
+    GenericFunctions.sendResponseToClientWithoutRouter(requestHandle, responseHandle, fullUrl);
   }
   else {
     router.sendResponseToClient(requestHandle, responseHandle, fullUrl);

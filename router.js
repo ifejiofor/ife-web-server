@@ -1,5 +1,5 @@
 import { thereIsMatch } from './generic-functions.js';
-import * as genericFunctions from './generic-functions.js';
+import * as GenericFunctions from './generic-functions.js';
 import { NAME_OF_ASSET_FOLDER } from './constants.js';
 
 /**
@@ -9,13 +9,22 @@ import { NAME_OF_ASSET_FOLDER } from './constants.js';
 class Router {
   /**
    * Constructor
-   * @param {JSON} routingTableOfThisRouter - the routing table of this router
    */
-  constructor(routingTableOfThisRouter) {
-    this.routingTable = routingTableOfThisRouter;
-    genericFunctions.replacePathParametersWithRegularExpressions(this.routingTable);
-    genericFunctions.capitalizeAllMethodNames(this.routingTable);
+  constructor() {
+    this.routingTable = null;
+  }
+  
+  /**
+   * Set the routing table of this router
+   * @param {JSON} routingTable - the routing table
+   */
+  setRoutingTable(routingTable) {
+    this.routingTable = routingTable;
+    GenericFunctions.replacePathParametersWithRegularExpressions(this.routingTable);
+    GenericFunctions.capitalizeAllMethodNames(this.routingTable);
+    console.log('\nROUTING TABLE');
     console.log(this.routingTable);
+    console.log('\n');
   }
   
   /**
@@ -25,7 +34,7 @@ class Router {
    * @param {string} urlRequestedByClient - url of resource that was requested by the client
    */
   sendResponseToClient(requestHandle, responseHandle, urlRequestedByClient) {
-    let path = null, matchingPath = null, matchHasBeenFound = false;
+    let path = null, matchingPath = null, matchHasBeenFound = false, matchNotFound = true;
     let httpMethodRequestedByClient = requestHandle.method;
     let controller = null;
     let firstPartOfUrl = null, secondPartOfUrl = null, urlToRedirectTo = null;
@@ -54,17 +63,19 @@ class Router {
       controller = this.routingTable[matchingPath][httpMethodRequestedByClient];
     }
     
-    if (typeof(controller) == 'function') {
+    matchNotFound = !matchHasBeenFound;
+    
+    if (matchHasBeenFound && typeof(controller) == 'function') {
       controller(requestHandle, responseHandle);
     }
-    else if (typeof(controller) != 'function' && lastCharacterOf(urlRequestedByClient) == '/') {
+    else if (matchNotFound && lastCharacterOf(urlRequestedByClient) == '/') {
       urlToRedirectTo = urlRequestedByClient.substring(0, urlRequestedByClient.length - 1);
-      genericFunctions.redirectTo(urlToRedirectTo, responseHandle);
+      GenericFunctions.redirectTo(urlToRedirectTo, responseHandle);
     }
-    else if (typeof(controller) != 'function' && refersToResourceFromAssetFolder(urlRequestedByClient)) {
+    else if (matchNotFound && refersToResourceFromAssetFolder(urlRequestedByClient)) {
       indexOfAssetFolder = urlRequestedByClient.indexOf(NAME_OF_ASSET_FOLDER);
       urlRequestedByClient = '.' + urlRequestedByClient.substring(indexOfAssetFolder);
-      genericFunctions.sendResponseToClientWithoutRouter(requestHandle, responseHandle, urlRequestedByClient);
+      GenericFunctions.sendResponseToClientWithoutRouter(requestHandle, responseHandle, urlRequestedByClient);
     }
     else {
       responseHandle.writeHead(404, { 'Content-Type': 'text/plain' });

@@ -21,7 +21,7 @@ export class LowLevelServer {
     console.log(`ife-http: About to start listening on port ${port}...`);
     
     // listen for incoming tcp connections, then loop through listening for client requests, and upon receiving a client request, parse it, create requestHandle and responseHandle, then call functionForProcessingClientRequests
-    exec(`./node_modules/mosig-server/src/low-level-server`, function (error, stdout, stderr) {
+    exec(`./node_modules/mosig-server/bin/low-level-server --port-number=${port}`, function (error, stdout, stderr) {
       if (error) {
         console.log('ife-http: Unfortunately, there is an error.');
         console.log(`${error}`);

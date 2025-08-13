@@ -1,5 +1,5 @@
-import { thereIsMatch } from './generic-functions.js';
 import * as GenericFunctions from './generic-functions.js';
+import { firstCharacterOf, lastCharacterOf, refersToResourceFromAssetFolder, thereIsMatch } from './generic-functions.js';
 import { NAME_OF_ASSET_FOLDER } from './constants.js';
 
 /**
@@ -37,10 +37,10 @@ class Router {
     let path = null, matchingPath = null, matchHasBeenFound = false, matchNotFound = true;
     let httpMethodRequestedByClient = requestHandle.method;
     let controller = null;
-    let firstPartOfUrl = null, secondPartOfUrl = null, urlToRedirectTo = null;
-    let indexOfAssetFolder = null;
+    let urlToRedirectTo = null;
+    let resourcePartOfUrl = null, resource = null;
     
-    if (firstCharacterOf(urlRequestedByClient) == '.') {
+    if (firstCharacterOf(urlRequestedByClient) == '.') { // TODO: Need to remind myself why this if-statement is here; it seems unnecessary
       urlRequestedByClient = urlRequestedByClient.substring(1);
     }
     
@@ -73,9 +73,9 @@ class Router {
       GenericFunctions.redirectTo(urlToRedirectTo, responseHandle);
     }
     else if (matchNotFound && refersToResourceFromAssetFolder(urlRequestedByClient)) {
-      indexOfAssetFolder = urlRequestedByClient.indexOf(NAME_OF_ASSET_FOLDER);
-      urlRequestedByClient = '.' + urlRequestedByClient.substring(indexOfAssetFolder);
-      GenericFunctions.sendResponseToClientWithoutRouter(requestHandle, responseHandle, urlRequestedByClient);
+      resourcePartOfUrl = urlRequestedByClient.indexOf(NAME_OF_ASSET_FOLDER);
+      resource = urlRequestedByClient.substring(resourcePartOfUrl);
+      GenericFunctions.sendResponseToClientWithoutRouter(requestHandle, responseHandle, resource);
     }
     else {
       responseHandle.writeHead(404, { 'Content-Type': 'text/plain' });

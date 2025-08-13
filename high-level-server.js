@@ -24,8 +24,8 @@ class HighLevelServer {
   }
   
   /**
-   * Start the server from a specific entry point and on a specific port
-   * @param {string} path - the entry point of the files that the server is supposed to deliver
+   * Start the server listen on a specific port and serve files from a specific file path
+   * @param {string} path - the entry point of the path where the files that the server is supposed to deliver are located
    * @param {number} port - a port number (between 1024–49151)
    */
   start(path, port = 8080) {
@@ -37,7 +37,6 @@ class HighLevelServer {
     
     let server = http.createServer(functionForProcessingClientRequests);
     server.listen(port);
-    console.log(`high-level-server: Server is started on port ${port}`);
   }
 }
 
@@ -45,12 +44,12 @@ class HighLevelServer {
  * Process client request
  * @param {object} requestHandle - object that contains details about the client's request
  * @param {object} responseHandle - object that can be used to send response to the client
- * @param {string} path - the entry point of the files that the server is supposed to deliver
+ * @param {string} path - the entry point of the path where the files that the server is supposed to deliver are located
  * @param {object} router - the router that is used to route client's request to an appropriate controller
  */
 function processClientRequest(requestHandle, responseHandle, path, router) {
   let fullUrl = path + requestHandle.url;
-  fullUrl = removeDoubleSlashesIfAny(fullUrl);
+  fullUrl = GenericFunctions.removeDoubleSlashesIfAny(fullUrl);
   console.log(`urlRequestedByClient: ${fullUrl}`);
   
   if (router == null) {

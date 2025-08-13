@@ -2,43 +2,47 @@ import fs from 'node:fs';
 import { NAME_OF_ASSET_FOLDER, MIME_TYPES } from './constants.js';
 
 /**
- * Replace all path parameters, in a routing table, with regular expressions.
+ * Replace all path parameters in a routing table with regular expressions.
  * @param {JSON} routingTable - the routing table whose path parameters are to be replaced.
  */
 export function replacePathParametersWithRegularExpressions(routingTable) {
-  let path = null, pathBeingReplaced = null, originalPath = null, pathParameters = null;
+  let path = null, pathBeingReplaced = null, pathParameters = null;
   let thereWasReplacement = false;
   
   for (path in routingTable) {
-    pathParameters = path.match(RegExp(':[a-zA-Z0-9_]+', 'g'));
-    pathBeingReplaced = originalPath = path;
+    pathBeingReplaced = path;
+    pathParameters = pathBeingReplaced.match(RegExp(':[a-zA-Z0-9_]+', 'g'));
+    
+    if (pathParameters == null) {
+      continue;
+    }
+    
     thereWasReplacement = false;
     
-    for (let i = 0; pathParameters != null && i < pathParameters.length; i++) {
+    for (let i = 0; i < pathParameters.length; i++) {
       pathBeingReplaced = pathBeingReplaced.replace(pathParameters[i], '[a-zA-Z0-9_]+');
       thereWasReplacement = true;
     }
     
     if (thereWasReplacement) {
-      routingTable[pathBeingReplaced] = routingTable[originalPath];
-      delete routingTable[originalPath];
+      routingTable[pathBeingReplaced] = routingTable[path];
+      delete routingTable[path];
     }
   }
 }
 
 /**
- *
+ * Capitalize all method names in a routing table.
+ * @param {JSON} routingTable - the routing table.
  */
 export function capitalizeAllMethodNames(routingTable) {
   for (let path in routingTable) {
-    let controllerObject = routingTable[path];
-    
-    for (let originalMethodName in controllerObject) {
+    for (let originalMethodName in routingTable[path]) {
       let capitalizedMethodName = originalMethodName.toString().toUpperCase();
       
       if (capitalizedMethodName != originalMethodName) {
-        controllerObject[capitalizedMethodName] = controllerObject[originalMethodName];
-        delete controllerObject[originalMethodName];
+        routingTable[path][capitalizedMethodName] = routingTable[path][originalMethodName];
+        delete routingTable[path][originalMethodName];
       }
     }
   }
@@ -107,9 +111,9 @@ export function removeDoubleSlashesIfAny(originalString) {
 export function sendResponseToClientWithoutRouter(requestHandle, responseHandle, fileRequestedByClient) {
   fs.readFile(fileRequestedByClient, function (error, data) {
     let codeOfResponse = getCodeOfResponse(fileRequestedByClient, error, data);
-    let headOfResponses = getHeadOfResponse(fileRequestedByClient, error, data);
+    let headOfResponse = getHeadOfResponse(fileRequestedByClient, error, data);
     let bodyOfResponse = getBodyOfResponse(fileRequestedByClient, error, data);
-    responseHandle.writeHead(codeOfResponse, headOfResponses);
+    responseHandle.writeHead(codeOfResponse, headOfResponse);
     responseHandle.end(bodyOfResponse);
   });
 }
@@ -186,7 +190,7 @@ export function getMimeType(filename) {
  * @param {string} filename - filename of the file.
  */
 export function getFileExtension(filename) {
-  let fileExtension = filename.match(RegExp('.[a-z]+$'));
+  let fileExtension = filename.trim().match(RegExp('.[a-z]+$'));
   
   if (fileExtension != null) {
     fileExtension = fileExtension.toString().substring(1);

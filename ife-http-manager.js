@@ -1,8 +1,8 @@
 import LowLevelServer from './low-level-server.js';
 
 /**
- * HTTP manager customised by me
- * The main job of the HTTP manager is to allow a high-level server to create a low-level server
+ * An HTTP manager customised by me
+ * The main job of this HTTP manager is to allow a high-level server to create a low-level server
  * @class
  */
 class HttpManager {
@@ -11,7 +11,7 @@ class HttpManager {
    * @param {function} functionForProcessingClientRequests - function that will be used to process client requests
    */
   createServer(functionForProcessingClientRequests) {
-    console.log('ife-http: Creating server...');
+    console.log('ife-http-manager: Creating server...');
     this.server = new LowLevelServer(functionForProcessingClientRequests);
     return this.server;
   }

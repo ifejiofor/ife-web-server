@@ -8,4 +8,4 @@ export const MIME_TYPES = {
   html: 'text/html'
 };
 
-export const NAME_OF_ASSET_FOLDER = '/asset';
+export const NAME_OF_ASSET_FOLDER = 'asset';

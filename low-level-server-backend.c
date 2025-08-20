@@ -187,7 +187,7 @@ void manage_client_requests(int socket_connected_to_client) {
             sscanf(line_of_client_request, "%s %s %s", http_method, url, http_version);
         }
         
-        if (strcmp(line_of_client_request, "\r\n") == 0) { // According to RFC 2616, "\r\n" indicates the last line of client request
+        if (strcmp(line_of_client_request, "\r\n") == 0) { // According to RFC 2616, "\r\n" (CRLF) indicates the last line of client request
             // Process client request
             process_client_request(http_method, url);
             
@@ -287,35 +287,92 @@ void process_client_request(const char *http_method, const char *url) {
 void send_response_to_client(int socket_connected_to_client) {
     char *line_from_response_header = NULL;
     size_t line_size = 0;
-    char *response_body = NULL;
-    int response_body_length = 0;
+    int content_length = 0;
+    char *transfer_encoding = malloc(MAXIMUM_ALLOWED_BUFFER_SIZE);
+    transfer_encoding[0] = '\0';
     
-    // Read lines from response header and send them to the client (at the same time, obtain the length of response body)
+    // Read lines from response header, send the lines to the client, and parse some information from the lines
     do {
         read_line(STDIN, &line_from_response_header, &line_size);
         printf("Scanned the following line from response header: '%s'\n", line_from_response_header);
         send(socket_connected_to_client, line_from_response_header, strlen(line_from_response_header), 0);
         convert_to_lowercase(line_from_response_header);
-        sscanf(line_from_response_header, "content-length: %d", &response_body_length);
+        sscanf(line_from_response_header, "content-length: %d", &content_length);
+        sscanf(line_from_response_header, "transfer-encoding: %s", transfer_encoding);
     } while (strcmp(line_from_response_header, "\r\n") != 0);
     
-    // Allocate memory for the response body
-    response_body = malloc(response_body_length);
+    // Free memory allocated for lines from response header
+    free(line_from_response_header);
     
-    // Obtain the response body
-    printf("Started obtaining response body...\n");
-    for (int i = 0; i < response_body_length; i++) {
-        read_one_byte(STDIN, &response_body[i]);
+    if (strstr(transfer_encoding, "chunked") != NULL) {
+        char *line_from_response_body = NULL;
+        char *chunk = NULL;
+        size_t line_size = 0;
+        unsigned int chunk_size = 0;
+        
+        for (;;) {
+            read_line(STDIN, &line_from_response_body, &line_size);
+            send(socket_connected_to_client, line_from_response_body, strlen(line_from_response_body), 0);
+            sscanf(line_from_response_body, "%x", &chunk_size);
+            
+            if (chunk_size == 0) {
+                break;
+            }
+            
+            // Increment chunk size by 2 to accomodate the CRLF at the end of the chunk (according to RFC 2616)
+            chunk_size += 2;
+            
+            // Allocate memory for the chunk
+            chunk = malloc(chunk_size);
+            
+            printf("Started obtaining a chunk of size %d from response body...\n", chunk_size - 2);
+            
+            // Obtain the chunk
+            for (int i = 0; i < chunk_size; i++) {
+                read_one_byte(STDIN, &chunk[i]);
+            }
+            
+            printf("Finished obtaining chunk; now sending the chunk to client...\n");
+            send(socket_connected_to_client, chunk, chunk_size, 0);
+            free(chunk);
+            chunk_size = 0;
+        }
+        
+        // Send the trailer to the client
+        do {
+            read_line(STDIN, &line_from_response_body, &line_size);
+            send(socket_connected_to_client, line_from_response_body, strlen(line_from_response_body), 0);
+        } while (strcmp(line_from_response_body, "\r\n") != 0);
+        
+        // Free memory allocated for lines from response body
+        free(line_from_response_body);
     }
-    printf("Finished obtaining response body (time to send response body to client).\n");
+    else if (content_length != 0) {
+        char *response_body = NULL;
+        
+        // Allocate memory for the response body
+        response_body = malloc(content_length);
+        
+        // Obtain the response body
+        printf("Started obtaining response body...\n");
+        
+        for (int i = 0; i < content_length; i++) {
+            read_one_byte(STDIN, &response_body[i]);
+        }
+        
+        printf("Finished obtaining response body; now sending response body to client...\n");
+        
+        // Send the response body to the client
+        send(socket_connected_to_client, response_body, content_length, 0);
+        
+        // Free memory allocated for the response body
+        free(response_body);
+    }
     
-    // Send the response body to the client
-    send(socket_connected_to_client, response_body, response_body_length, 0);
     printf("Finished sending response body to client.\n");
     
-    // Free resources that are no longer needed
-    free(line_from_response_header);
-    free(response_body);
+    // Free memory allocated for trasfer encoding
+    free(transfer_encoding);
 }
 
 /**

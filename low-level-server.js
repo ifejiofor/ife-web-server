@@ -1,17 +1,19 @@
-import { spawn } from 'node:child_process';
-import ResponseHandle from './response-handle.js';
+import net from "node:net";
+import { spawn } from "node:child_process";
+import { lastCharacterOf } from "./generic-functions.js";
+import ResponseHandle from "./response-handle.js";
 
 /**
- * Low-level HTTP server that can listen on a specific port
+ * Low-level server that can listen for, and interpret, HTTP requests
  * @class
  */
 class LowLevelServer {
   /**
-   * Constructor.
-   * @param {function} functionForProcessingClientRequests - function that will be used to process client requests
+   * Constructor
+   * @param {function} functionToCallWheneverThereIsHttpRequest - function to call whenever there is an HTTP request
    */
-  constructor(functionForProcessingClientRequests) {
-    this.functionForProcessingClientRequests = functionForProcessingClientRequests;
+  constructor(functionToCallWheneverThereIsHttpRequest) {
+    this.functionToCallWheneverThereIsHttpRequest = functionToCallWheneverThereIsHttpRequest;
   }
   
   /**
@@ -20,48 +22,72 @@ class LowLevelServer {
    */
   listen(portNumber = 8080) {
     console.log(`low-level-server: About to start listening on port ${portNumber}...`);
+    let functionToCallWheneverThereIsHttpRequest = this.functionToCallWheneverThereIsHttpRequest;
+    let clientInterface = spawn("node_modules/mosig-server/bin/client-interface", [`--port-number=${portNumber}`]);
     
-    let backend = spawn('./node_modules/mosig-server/bin/low-level-server-backend', [`--port-number=${portNumber}`]);
-    this.responseHandle = new ResponseHandle(backend.stdin);
+    let functionToCallWheneverThereIsNewConnectionToClientInterface = function (newConnectionToClientInterface) {
+      manageHttpRequests(newConnectionToClientInterface, functionToCallWheneverThereIsHttpRequest);
+    };
     
-    backend.stdout.on('data', (data) => {
-      data = data.toString();
-      console.log(data);
-      
-      for (let line of data.split('\n')) {
-        if (containsRequestHandle(line)) {
-          console.log('low-level-server: A requestHandle has just been obtained from the backend');
-          let requestHandle = extractRequestHandle(line);
-          this.functionForProcessingClientRequests(requestHandle, this.responseHandle);
-        }
-      }
+    let server = net.createServer(functionToCallWheneverThereIsNewConnectionToClientInterface);
+    server.listen("/tmp/client-interface.sock");
+    
+    clientInterface.stdout.on("data", (data) => {
+      console.log(data.toString());
     });
     
-    backend.stderr.on('data', (data) => {
+    clientInterface.stderr.on("data", (data) => {
         console.error(data.toString());
     });
     
-    backend.on('error', (error) => {
-        console.error('low-level-server: Unfortunately, there is an error');
-        console.error(`${error}`);
+    clientInterface.on("error", (error) => {
+        console.error("low-level-server: Unfortunately, there is an error on the client interface");
+        console.error(error.toString());
     });
   }
 }
 
 /**
- *
+ * Function that manages HTTP requests that are received through a client interface
+ * @param {net.Socket} connectionToClientInterface - socket that is connected to the client interface
+ * @param {function} functionToCallWheneverThereIsHttpRequest - function to call whenever there is an HTTP request
  */
-function containsRequestHandle(string) {
-  let endOfPreamble = string.indexOf(':');
-  return string.slice(0, endOfPreamble) == 'requestHandle';
-}
-
-/**
- *
- */
-function extractRequestHandle(string) {
-  let endOfPreamble = string.indexOf(':');
-  return JSON.parse(string.slice(endOfPreamble + 1));
+function manageHttpRequests(connectionToClientInterface, functionToCallWheneverThereIsHttpRequest) {
+  let lineNumber = 0;
+  let lines = [];
+  let buffer = "";
+  let httpMethod = "", url = "", httpVersion = "";
+  let requestHandle = { headers: {} };
+  let responseHandle = new ResponseHandle(connectionToClientInterface);
+  
+  connectionToClientInterface.on("data", (data) => {
+    buffer += data.toString();
+    lines = buffer.split("\n");
+    buffer = lines.pop(); // keep the last partial line in the buffer
+    
+    for (let line of lines) {
+      line = `${line}\n`;
+      lineNumber++;
+      
+      if (lineNumber == 1) {
+        [httpMethod, url, httpVersion] = line.split(/\s+/);
+        requestHandle.method = httpMethod;
+        requestHandle.url = url;
+      }
+      
+      if (lineNumber > 1 && line != "\r\n") { // this means that this line contains a key-value pair (according to RFC 2616)
+        let delimiter = line.indexOf(":");
+        let key = line.substring(0, delimiter).trim().toLowerCase();
+        let value = line.substring(delimiter + 1).trim();
+        requestHandle.headers[key] = value;
+      }
+      
+      if (line == "\r\n") { // According to RFC 2616, "\r\n" (CRLF) indicates the last line of an HTTP request
+        functionToCallWheneverThereIsHttpRequest(requestHandle, responseHandle);
+        lineNumber = 0;
+      }
+    }
+  });
 }
 
 export default LowLevelServer;

@@ -1,9 +1,9 @@
-import http from './ife-http-manager.js'; // this is my alternative to `import http from 'node:http'`
-import Router from './router.js';
-import * as GenericFunctions from './generic-functions.js';
+import http from "./ife-http-manager.js"; // this is my alternative to import http from "node:http"
+import Router from "./router.js";
+import { sendResponseToClientWithoutRouter } from "./generic-functions.js";
 
 /**
- * High-level HTTP server that can listen on a specific port
+ * High-level server that collaborates with a low-level server to serve HTTP requests
  * @class
  */
 class HighLevelServer {
@@ -19,44 +19,40 @@ class HighLevelServer {
    * @param {JSON} routingTable - the routing table
    */
   setRoutingTable(routingTable) {
-    this.router = new Router()
+    this.router = new Router();
     this.router.setRoutingTable(routingTable);
   }
   
   /**
-   * Start the server listen on a specific port and serve files from a specific file path
-   * @param {string} path - the entry point of the path where the files that the server is supposed to deliver are located
-   * @param {number} port - a port number (between 1024–49151)
+   * Start this high-level server to listen on a specific port and serve files from a specific root path
+   * @param {number} port - port number (between 1024–49151)
+   * @param {string} rootPath - the root of the path where files that this server will serve are located
    */
-  start(path, port = 8080) {
+  start(port = 8080, rootPath = "./") {
     let router = this.router;
     
-    let functionForProcessingClientRequests = function (requestHandle, responseHandle) {
-      processClientRequest(requestHandle, responseHandle, path, router);
+    let functionToCallWheneverThereIsHttpRequest = function (requestHandle, responseHandle) {
+      processHttpRequest(requestHandle, responseHandle, rootPath, router);
     }
     
-    let server = http.createServer(functionForProcessingClientRequests);
+    let server = http.createServer(functionToCallWheneverThereIsHttpRequest);
     server.listen(port);
   }
 }
 
 /**
- * Process client request
- * @param {object} requestHandle - object that contains details about the client's request
- * @param {object} responseHandle - object that can be used to send response to the client
- * @param {string} path - the entry point of the path where the files that the server is supposed to deliver are located
- * @param {object} router - the router that is used to route client's request to an appropriate controller
+ * Process an HTTP request
+ * @param {object} requestHandle - object that contains details about the HTTP request
+ * @param {object} responseHandle - object that should be used to send HTTP response to client
+ * @param {string} rootPath - the root of the path where files that the server will serve are located
+ * @param {object} router - the router that should be used to route the HTTP request to an appropriate controller
  */
-function processClientRequest(requestHandle, responseHandle, path, router) {
-  let fullUrl = path + requestHandle.url;
-  fullUrl = GenericFunctions.removeDoubleSlashesIfAny(fullUrl);
-  console.log(`urlRequestedByClient: ${fullUrl}`);
-  
+function processHttpRequest(requestHandle, responseHandle, rootPath, router) {
   if (router == null) {
-    GenericFunctions.sendResponseToClientWithoutRouter(requestHandle, responseHandle, fullUrl);
+    sendResponseToClientWithoutRouter(requestHandle, responseHandle, rootPath);
   }
   else {
-    router.sendResponseToClient(requestHandle, responseHandle, fullUrl);
+    router.sendResponseToClient(requestHandle, responseHandle, rootPath);
   }
 }
 
